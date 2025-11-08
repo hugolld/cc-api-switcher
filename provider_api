@@ -1,0 +1,49 @@
+# The following lines are to enable Claude Code and its derivatives:
+## By Default, Claude Code is routed to use kimi api
+
+# NOTE: These are example placeholder tokens. Replace with your actual API keys.
+# export ANTHROPIC_AUTH_TOKEN=sk-glm-example-placeholder
+# export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+
+## kimi configs
+# kimi() {
+#     export ANTHROPIC_AUTH_TOKEN=sk-kimi-example-placeholder
+#     export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+#     export ANTHROPIC_MODEL=kimi-for-coding
+#     export ANTHROPIC_SMALL_FAST_MODEL=kimi-for-coding
+#     claude $1
+# }
+
+## glm configs
+# glm() {
+#     export ANTHROPIC_AUTH_TOKEN=sk-glm-example-placeholder
+#     export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+#     export ANTHROPIC_DEFAULT_OPUS_MODEL=glm-4.6
+#     export ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.6
+#     export ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.5-air
+#     claude $1
+# }
+
+## qwen3-coder configs
+# qwen() {
+#     export ANTHROPIC_AUTH_TOKEN=sk-qwen-example-placeholder
+#     export ANTHROPIC_BASE_URL=https://dashscope.aliyuncs.com/api/v2/apps/claude-code-proxy
+#     claude $1
+# }
+
+## deepseek configs
+# deepseek(){
+#     export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+#     export ANTHROPIC_AUTH_TOKEN=sk-deepseek-example-placeholder
+#     export API_TIMEOUT_MS=600000
+#     export ANTHROPIC_MODEL=deepseek-chat
+#     export ANTHROPIC_SMALL_FAST_MODEL=deepseek-chat
+#     export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+#     claude $1
+# }
+
+# IMPORTANT: Replace the placeholder tokens above with your actual API keys from:
+# - Kimi: https://platform.moonshot.cn/
+# - GLM: https://open.bigmodel.cn/
+# - Qwen: https://dashscope.aliyun.com/
+# - DeepSeek: https://platform.deepseek.com/
