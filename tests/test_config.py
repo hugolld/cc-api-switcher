@@ -220,3 +220,146 @@ class TestProfileStore:
             saved_data = json.load(f)
 
         assert saved_data["env"]["ANTHROPIC_AUTH_TOKEN"] == "test-token"
+
+    def test_get_profile_path_explicit_mode(self, tmp_path):
+        """Test getting profile path in explicit mode."""
+        store = ProfileStore(tmp_path)
+
+        # Test with profile that doesn't exist (should return path for creation)
+        profile_path = store.get_profile_path("newprofile")
+        expected_path = tmp_path / "newprofile_settings.json"
+        assert profile_path == expected_path
+
+        # Create a profile file and test again
+        profile_data = {
+            "env": {
+                "ANTHROPIC_BASE_URL": "https://api.example.com",
+                "ANTHROPIC_AUTH_TOKEN": "test-token",
+            }
+        }
+        profile_file = tmp_path / "newprofile_settings.json"
+        with open(profile_file, "w") as f:
+            json.dump(profile_data, f)
+
+        profile_path = store.get_profile_path("newprofile")
+        assert profile_path == expected_path
+
+    def test_get_profile_path_global_mode(self, tmp_path, monkeypatch):
+        """Test getting profile path in global mode."""
+        from cc_api_switcher.global_config import GlobalConfig
+
+        # Create a temporary config and profile directory
+        config_dir = tmp_path / "config"
+        profiles_dir = tmp_path / "profiles"
+        config_dir.mkdir()
+        profiles_dir.mkdir()
+
+        # Create a config file that points to our profiles directory
+        config_file = config_dir / "config.json"
+        config_data = {
+            "default_profile_dir": str(profiles_dir),
+            "default_target_path": "~/.claude/settings.json",
+            "backup_retention_count": 10,
+            "auto_backup": True
+        }
+        with open(config_file, "w") as f:
+            json.dump(config_data, f)
+
+        # Create a profile file
+        profile_data = {
+            "env": {
+                "ANTHROPIC_BASE_URL": "https://api.example.com",
+                "ANTHROPIC_AUTH_TOKEN": "test-token",
+            }
+        }
+        profile_file = profiles_dir / "testprofile_settings.json"
+        with open(profile_file, "w") as f:
+            json.dump(profile_data, f)
+
+        # Override XDG_CONFIG_HOME to point to our temp config dir
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(config_dir))
+
+        # Create ProfileStore in global mode
+        global_config = GlobalConfig(config_file=config_file)
+        store = ProfileStore(global_config=global_config)
+
+        # Test getting profile path
+        profile_path = store.get_profile_path("testprofile")
+        assert profile_path == profile_file
+
+        # Test with non-existent profile should raise error
+        with pytest.raises(ProfileNotFoundError):
+            store.get_profile_path("nonexistent")
+
+    def test_profile_exists_explicit_mode(self, tmp_path):
+        """Test checking profile existence in explicit mode."""
+        store = ProfileStore(tmp_path)
+
+        # Test with non-existent profile
+        assert not store.profile_exists("nonexistent")
+
+        # Create a profile file
+        profile_data = {
+            "env": {
+                "ANTHROPIC_BASE_URL": "https://api.example.com",
+                "ANTHROPIC_AUTH_TOKEN": "test-token",
+            }
+        }
+        profile_file = tmp_path / "testprofile_settings.json"
+        with open(profile_file, "w") as f:
+            json.dump(profile_data, f)
+
+        # Test with existing profile
+        assert store.profile_exists("testprofile")
+
+        # Test with legacy naming convention
+        legacy_file = tmp_path / "legacy.json"
+        with open(legacy_file, "w") as f:
+            json.dump(profile_data, f)
+
+        assert store.profile_exists("legacy")
+
+    def test_profile_exists_global_mode(self, tmp_path, monkeypatch):
+        """Test checking profile existence in global mode."""
+        from cc_api_switcher.global_config import GlobalConfig
+
+        # Create a temporary config and profile directory
+        config_dir = tmp_path / "config"
+        profiles_dir = tmp_path / "profiles"
+        config_dir.mkdir()
+        profiles_dir.mkdir()
+
+        # Create a config file that points to our profiles directory
+        config_file = config_dir / "config.json"
+        config_data = {
+            "default_profile_dir": str(profiles_dir),
+            "default_target_path": "~/.claude/settings.json",
+            "backup_retention_count": 10,
+            "auto_backup": True
+        }
+        with open(config_file, "w") as f:
+            json.dump(config_data, f)
+
+        # Create a profile file
+        profile_data = {
+            "env": {
+                "ANTHROPIC_BASE_URL": "https://api.example.com",
+                "ANTHROPIC_AUTH_TOKEN": "test-token",
+            }
+        }
+        profile_file = profiles_dir / "testprofile_settings.json"
+        with open(profile_file, "w") as f:
+            json.dump(profile_data, f)
+
+        # Override XDG_CONFIG_HOME to point to our temp config dir
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(config_dir))
+
+        # Create ProfileStore in global mode
+        global_config = GlobalConfig(config_file=config_file)
+        store = ProfileStore(global_config=global_config)
+
+        # Test with existing profile
+        assert store.profile_exists("testprofile")
+
+        # Test with non-existent profile
+        assert not store.profile_exists("nonexistent")

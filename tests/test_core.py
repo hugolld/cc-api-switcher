@@ -10,6 +10,7 @@ import pytest
 from cc_api_switcher.config import SettingsProfile
 from cc_api_switcher.core import CcApiSwitcher
 from cc_api_switcher.exceptions import BackupError, CcApiSwitcherError
+from cc_api_switcher.global_config import GlobalConfig
 
 
 class TestCcApiSwitcher:
@@ -205,3 +206,157 @@ class TestCcApiSwitcher:
         assert "1234************7890" in info  # Masked token preserving original length
         assert "deepseek-chat" in info
         assert "600s" in info or "600.0s" in info  # Handle both formats
+
+
+class TestCcApiSwitcherGlobalConfig:
+    """Test CcApiSwitcher integration with GlobalConfig."""
+
+    def test_init_with_global_config_default_target(self, tmp_path):
+        """Test initialization with GlobalConfig for default target path."""
+        config_file = tmp_path / "config.json"
+        custom_target = tmp_path / "custom_settings.json"
+
+        # Create a config with custom target
+        config_data = {
+            "default_target": str(custom_target),
+            "backup_retention_count": 5,
+            "auto_backup": False
+        }
+        config_file.write_text(json.dumps(config_data))
+
+        # Mock GlobalConfig to use our test config
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.get_default_target_path.return_value = custom_target
+            mock_config.get_backup_retention_count.return_value = 5
+            mock_config.is_auto_backup_enabled.return_value = False
+
+            switcher = CcApiSwitcher(global_config=mock_config)
+
+            assert switcher.target_path == custom_target
+            assert switcher.global_config == mock_config
+
+    def test_init_without_global_config_uses_default(self, tmp_path):
+        """Test initialization without GlobalConfig uses system default."""
+        target = tmp_path / "settings.json"
+
+        with patch('cc_api_switcher.core.get_default_target_path') as mock_default:
+            mock_default.return_value = target
+
+            switcher = CcApiSwitcher()
+
+            assert switcher.target_path == target
+            assert switcher.global_config is None
+
+    def test_get_backup_retention_count_with_global_config(self, tmp_path):
+        """Test backup retention count from GlobalConfig."""
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.get_backup_retention_count.return_value = 7
+
+            switcher = CcApiSwitcher(global_config=mock_config)
+            retention = switcher._get_backup_retention_count()
+
+            assert retention == 7
+            mock_config.get_backup_retention_count.assert_called_once()
+
+    def test_get_backup_retention_count_without_global_config(self, tmp_path):
+        """Test backup retention count fallback without GlobalConfig."""
+        switcher = CcApiSwitcher()
+        retention = switcher._get_backup_retention_count()
+
+        assert retention == 10  # Default fallback
+
+    def test_get_backup_retention_count_invalid_value(self, tmp_path):
+        """Test backup retention count with invalid value falls back to default."""
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.get_backup_retention_count.return_value = -5  # Invalid
+
+            switcher = CcApiSwitcher(global_config=mock_config)
+            retention = switcher._get_backup_retention_count()
+
+            assert retention == 10  # Fallback for invalid value
+
+    def test_is_auto_backup_enabled_with_global_config(self, tmp_path):
+        """Test auto-backup toggle from GlobalConfig."""
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.is_auto_backup_enabled.return_value = False
+
+            switcher = CcApiSwitcher(global_config=mock_config)
+            auto_backup = switcher._is_auto_backup_enabled()
+
+            assert auto_backup is False
+            mock_config.is_auto_backup_enabled.assert_called_once()
+
+    def test_is_auto_backup_enabled_without_global_config(self, tmp_path):
+        """Test auto-backup toggle fallback without GlobalConfig."""
+        switcher = CcApiSwitcher()
+        auto_backup = switcher._is_auto_backup_enabled()
+
+        assert auto_backup is True  # Default fallback
+
+    def test_cleanup_old_backups_uses_configured_retention(self, tmp_path):
+        """Test cleanup uses configured retention count."""
+        target = tmp_path / "settings.json"
+        backup_dir = tmp_path / "backups"
+        backup_dir.mkdir()
+
+        # Create more than 5 backups
+        for i in range(8):
+            backup_file = backup_dir / f"settings.json.backup.2023120{i}_{i:02d}00"
+            backup_file.write_text(f"backup content {i}")
+
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.get_backup_retention_count.return_value = 5
+
+            switcher = CcApiSwitcher(target_path=target, backup_dir=backup_dir, global_config=mock_config)
+            switcher._cleanup_old_backups()
+
+            # Should keep only 5 most recent backups
+            remaining_backups = list(backup_dir.glob("*.backup.*"))
+            assert len(remaining_backups) == 5
+
+    def test_switch_to_respects_auto_backup_setting(self, tmp_path):
+        """Test switch_to respects auto-backup setting from GlobalConfig."""
+        target = tmp_path / "settings.json"
+        backup_dir = tmp_path / "backups"
+        backup_dir.mkdir()
+
+        # Create existing target file
+        target.write_text('{"existing": "settings"}')
+
+        profile_data = {
+            "env": {
+                "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+                "ANTHROPIC_AUTH_TOKEN": "sk-test123",
+            }
+        }
+        profile = SettingsProfile.from_dict(profile_data, name="test")
+
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.is_auto_backup_enabled.return_value = False  # Auto-backup disabled
+
+            switcher = CcApiSwitcher(target_path=target, backup_dir=backup_dir, global_config=mock_config)
+            switcher.switch_to(profile, create_backup=True)
+
+            # No backup should be created when auto-backup is disabled
+            backups = list(backup_dir.glob("*.backup.*"))
+            assert len(backups) == 0
+
+    def test_backup_settings_validation_warnings(self, tmp_path, capsys):
+        """Test backup settings validation produces warnings for invalid settings."""
+        with patch('cc_api_switcher.core.GlobalConfig') as mock_global_config:
+            mock_config = mock_global_config.return_value
+            mock_config.get_backup_retention_count.return_value = -3  # Invalid
+            mock_config.get_default_target_path.return_value = tmp_path / "nonexistent" / "settings.json"
+
+            switcher = CcApiSwitcher(global_config=mock_config)
+
+            # Capture stderr to check for warnings
+            captured = capsys.readouterr()
+            assert "Invalid backup_retention_count" in captured.err
+            assert "Target parent directory does not exist" in captured.err

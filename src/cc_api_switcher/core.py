@@ -12,6 +12,7 @@ from .exceptions import (
     BackupError,
     CcApiSwitcherError,
 )
+from .global_config import GlobalConfig
 
 
 class CcApiSwitcher:
@@ -21,7 +22,7 @@ class CcApiSwitcher:
         self,
         target_path: Optional[Path] = None,
         backup_dir: Optional[Path] = None,
-        global_config=None,
+        global_config: Optional[GlobalConfig] = None,
     ):
         """
         Initialize CC API switcher.
@@ -31,9 +32,18 @@ class CcApiSwitcher:
             backup_dir: Optional backup directory
             global_config: Optional GlobalConfig instance
         """
+        # Store global config for backup settings
+        self.global_config = global_config
+        if self.global_config is None:
+            try:
+                self.global_config = GlobalConfig()
+            except Exception:
+                # Allow operation without global config (legacy/local mode)
+                self.global_config = None
+
         # Use global config for default target path if provided
-        if global_config and not target_path:
-            self.target_path = global_config.get_default_target_path()
+        if self.global_config and not target_path:
+            self.target_path = self.global_config.get_default_target_path()
         else:
             self.target_path = target_path or get_default_target_path()
 
@@ -41,10 +51,66 @@ class CcApiSwitcher:
         if backup_dir:
             self.backup_dir = backup_dir
         else:
-            config_dir = Path.home() / ".config" / "cc-api-switcher" / "backups"
+            config_dir = (
+                Path.home() / ".config" / "cc-api-switcher" / "backups"
+                if not self.global_config
+                else self.global_config.config_dir / "backups"
+            )
             self.backup_dir = config_dir
 
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+
+        # Validate backup settings if GlobalConfig is provided
+        self._validate_backup_settings()
+
+    def _get_backup_retention_count(self) -> int:
+        """
+        Get backup retention count from config or fallback to default.
+
+        Returns:
+            Number of backups to retain
+        """
+        if self.global_config:
+            retention = self.global_config.get_backup_retention_count()
+            # Validate retention count is positive
+            if retention <= 0:
+                return 10  # Fallback to default
+            return retention
+        return 10  # Default fallback
+
+    def _is_auto_backup_enabled(self) -> bool:
+        """
+        Check if auto-backup is enabled.
+
+        Returns:
+            True if auto backup is enabled
+        """
+        if self.global_config:
+            return self.global_config.is_auto_backup_enabled()
+        return True  # Default fallback
+
+    def _validate_backup_settings(self) -> None:
+        """
+        Validate backup configuration and provide warnings for invalid settings.
+        """
+        if not self.global_config:
+            return  # No validation needed if no global config
+
+        try:
+            retention = self.global_config.get_backup_retention_count()
+            if retention <= 0:
+                # Invalid retention count, log warning but don't fail
+                import sys
+                print(f"Warning: Invalid backup_retention_count ({retention}), using default of 10", file=sys.stderr)
+
+            target_path = self.global_config.get_default_target_path()
+            if not target_path.parent.exists():
+                import sys
+                print(f"Warning: Target parent directory does not exist: {target_path.parent}", file=sys.stderr)
+
+        except Exception as e:
+            import sys
+            print(f"Warning: Failed to validate backup settings: {e}", file=sys.stderr)
 
     def switch_to(
         self, profile: SettingsProfile, create_backup: bool = True
@@ -58,7 +124,10 @@ class CcApiSwitcher:
             )
             raise CcApiSwitcherError(error_msg)
 
-        if create_backup and self.target_path.exists():
+        # Check if auto-backup is enabled when create_backup is True
+        should_create_backup = create_backup and self._is_auto_backup_enabled() and self.target_path.exists()
+
+        if should_create_backup:
             backup_path = self._create_backup()
             print(f"✓ Created backup: {backup_path}")
 
@@ -99,8 +168,9 @@ class CcApiSwitcher:
         except Exception as e:
             raise BackupError(f"Failed to create backup: {e}")
 
-    def _cleanup_old_backups(self, keep: int = 10) -> None:
-        """Remove old backups, keeping only the most recent."""
+    def _cleanup_old_backups(self) -> None:
+        """Remove old backups using configured retention count."""
+        retention_count = self._get_backup_retention_count()
         backup_pattern = f"{self.target_path.name}.backup.*"
         backups = sorted(
             self.backup_dir.glob(backup_pattern),
@@ -108,7 +178,7 @@ class CcApiSwitcher:
             reverse=True,
         )
 
-        for old_backup in backups[keep:]:
+        for old_backup in backups[retention_count:]:
             try:
                 old_backup.unlink()
             except Exception:

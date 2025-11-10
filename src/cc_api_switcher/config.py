@@ -237,6 +237,60 @@ class ProfileStore:
 
         return None
 
+    def get_profile_path(self, name: str) -> Path:
+        """
+        Get the file path for a profile by name.
+
+        This method works in both explicit and global modes without exposing
+        internal directory attributes.
+
+        Args:
+            name: Profile name
+
+        Returns:
+            Path to the profile file (in explicit mode, returns path even if file doesn't exist)
+
+        Raises:
+            ProfileNotFoundError: In global mode, if the profile cannot be found
+        """
+        if self.explicit_dir:
+            # Backwards compatibility: single directory mode
+            # Return the preferred path even if file doesn't exist (for creation)
+            return self.explicit_dir / f"{name}_settings.json"
+        else:
+            # Global mode: hierarchical discovery
+            profile_path = self.global_config.find_profile_file(name)
+            if not profile_path:
+                raise ProfileNotFoundError(
+                    f"Profile '{name}' not found. No profiles found in any search directory. "
+                    f"Use 'cc-api-switch init' to set up global configuration."
+                )
+            return profile_path
+
+    def profile_exists(self, name: str) -> bool:
+        """
+        Check if a profile file exists.
+
+        This method works in both explicit and global modes without exposing
+        internal directory attributes.
+
+        Args:
+            name: Profile name
+
+        Returns:
+            True if the profile file exists, False otherwise
+        """
+        if self.explicit_dir:
+            # Backwards compatibility: single directory mode
+            profile_file = self.explicit_dir / f"{name}_settings.json"
+            if not profile_file.exists():
+                profile_file = self.explicit_dir / f"{name}.json"
+            return profile_file.exists()
+        else:
+            # Global mode: hierarchical discovery
+            profile_path = self.global_config.find_profile_file(name)
+            return profile_path is not None
+
 
 def mask_token(token: str) -> str:
     """Mask API token for safe display."""

@@ -243,7 +243,7 @@ Profile files follow this JSON format (stored as `{name}_settings.json`):
 - pytest: Coverage reports with HTML output
 
 **Testing Architecture:**
-- 57 total tests across 4 files
+- 91 total tests across 5 test files
 - CLI tests: Typer CliRunner for command testing
 - Config tests: Profile validation, token masking
 - Core tests: Atomic operations, backup/restore
@@ -289,11 +289,13 @@ Profile files follow this JSON format (stored as `{name}_settings.json`):
 ## Development Workflow
 
 ### Making Changes
-1. Always run tests before committing: `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run pytest`
-2. Format and lint code: `uv run ruff format . && uv run ruff check .`
-3. Run type checking: `uv run mypy src`
-4. Test CLI manually: `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m cc_api_switcher.cli list`
-5. Test global configuration: `cc-api-switch init && cc-api-switch profile-dir`
+1. Always run tests before committing: `PYTHONPATH=src .venv/bin/pytest` (or `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run pytest`)
+2. Address test failures: Currently 12 failed, 79 passed (61% coverage)
+3. Format and lint code: `uv run ruff format . && uv run ruff check .`
+4. Run type checking: `uv run mypy src`
+5. Test CLI manually: `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m cc_api_switcher.cli list`
+6. Test global configuration: `cc-api-switch init && cc-api-switch profile-dir`
+7. Verify global workflow: Test commands without `--dir` flag to ensure no crashes
 
 ### Testing Patterns
 - **CLI Tests**: Use `typer.testing.CliRunner` for command testing
@@ -327,6 +329,25 @@ with tempfile.TemporaryDirectory() as temp_dir:
     os.environ['XDG_CONFIG_HOME'] = temp_dir
     config = GlobalConfig()
     # test global config features here
+
+# Testing global workflow (CRITICAL - no --dir flag)
+from cc_api_switcher.global_config import GlobalConfig
+from cc_api_switcher.config import ProfileStore
+import tempfile
+import os
+
+with tempfile.TemporaryDirectory() as temp_dir:
+    os.environ['XDG_CONFIG_HOME'] = temp_dir
+    os.environ['CC_API_SWITCHER_PROFILE_DIR'] = temp_dir
+
+    # Test global mode without --dir (this is where bugs exist)
+    runner = CliRunner()
+    result = runner.invoke(app, ['list'])  # No --dir flag
+    assert result.exit_code == 0
+
+    # Test import/edit commands in global mode (currently crash)
+    result = runner.invoke(app, ['import', 'test_profile'])
+    # Should not crash with AttributeError on profiles_dir
 ```
 
 ## Working with This Codebase
@@ -459,3 +480,28 @@ The tool supports both legacy local configuration and modern global configuratio
 - Migration utilities available to transition from local to global
 - Environment variables can override default locations
 - XDG Base Directory specification compliance
+
+## Current Known Issues
+
+### Critical Bugs (CODE_REVIEW.md Verified)
+1. **CLI Import/Edit Commands Crash in Global Mode** - Commands crash when `--dir` is not specified due to null pointer dereference on `store.profiles_dir`
+2. **Backup/Restore Commands Ignore Configured Default Target** - Don't respect configured default target paths from global config
+3. **Hard-coded Backup Retention** - Ignores `backup_retention_count` from GlobalConfig, always uses 10
+
+### Testing Gaps
+- CLI tests only use `--dir` flag, leaving global workflow (default mode) untested
+- Missing tests for import/edit commands in global mode
+- Missing integration tests between GlobalConfig and CLI commands
+
+### Current Test Status
+- **Suite Result**: 12 failed, 79 passed (61% coverage)
+- **Test Command**: `PYTHONPATH=src .venv/bin/pytest` (PYTHONPATH required for module imports)
+- **Total Tests**: 91 tests across 5 test files
+- **Failure Rate**: 13.2% (12 failures indicate active bugs, particularly in global workflow)
+
+### Development Priorities
+1. **Fix failing tests** - Address 12 test failures (13.2% failure rate) to restore test suite health
+2. Fix critical bugs that crash import/edit commands in global mode
+3. Make backup/restore commands respect user configuration
+4. Add comprehensive test coverage for global workflow scenarios
+5. Consider CLI architecture modularization (cli.py is 943 lines)
