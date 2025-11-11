@@ -268,7 +268,7 @@ def create_backup(
         target_path = command.get_target_path(target)
 
         from ..core import CcApiSwitcher
-        switcher = CcApiSwitcher(target_path=target_path)
+        switcher = CcApiSwitcher(target_path=target_path, global_config=command.global_config)
 
         # Check if settings file exists
         if not target_path.exists():
@@ -306,7 +306,7 @@ def restore_from_backup(
         target_path = command.get_target_path(target)
 
         from ..core import CcApiSwitcher
-        switcher = CcApiSwitcher(target_path=target_path)
+        switcher = CcApiSwitcher(target_path=target_path, global_config=command.global_config)
 
         if list_backups:
             backups = switcher.list_backups()
@@ -476,7 +476,7 @@ def import_profile(
         command.info(f"Provider: {profile.provider}")
 
         # Show validation issues if any
-        issues = command.store.validate_profile(profile)
+        issues = profile.validate_profile()
         if issues:
             command.warning("Profile has validation issues:")
             for issue in issues:
@@ -504,7 +504,7 @@ def edit_profile(
         profile = command.store.get_profile(name)
 
         # Get profile file path
-        profile_file = command.store.get_profile_file(name)
+        profile_file = command.store.get_profile_path(name)
 
         # Get editor command
         from .helpers import get_editor_command
@@ -523,7 +523,7 @@ def edit_profile(
         # Validate edited profile
         try:
             edited_profile = command.store.get_profile(name)
-            issues = command.store.validate_profile(edited_profile)
+            issues = edited_profile.validate_profile()
 
             if issues:
                 command.warning("Edited profile has validation issues:")
