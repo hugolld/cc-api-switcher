@@ -65,7 +65,7 @@ class TestCcApiSwitcher:
             backup_file = backup_dir / f"settings.json.backup.{i}"
             backup_file.write_text(f"backup{i}")
 
-        switcher._cleanup_old_backups(keep=10)
+        switcher._cleanup_old_backups()
 
         # Should keep only 10
         remaining = list(backup_dir.glob("*"))
@@ -258,7 +258,8 @@ class TestCcApiSwitcherGlobalConfig:
             retention = switcher._get_backup_retention_count()
 
             assert retention == 7
-            mock_config.get_backup_retention_count.assert_called_once()
+            # Called once during validation and once in the test
+            assert mock_config.get_backup_retention_count.call_count == 2
 
     def test_get_backup_retention_count_without_global_config(self, tmp_path):
         """Test backup retention count fallback without GlobalConfig."""

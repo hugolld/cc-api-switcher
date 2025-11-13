@@ -1,5 +1,5 @@
 [project]
-name = "cc-api-switcher"
+name = "cc-api-switch"
 version = "0.1.0"
 description = "Switch between API provider settings for Claude Code"
 readme = "README.md"

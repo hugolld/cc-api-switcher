@@ -25,23 +25,25 @@ class SettingsProfile(BaseModel):
         if "deepseek" in base_url:
             return "DeepSeek"
         elif "bigmodel" in base_url:
-            return "GLM"
+            return "Zhipu.AI"
         elif "minimaxi" in base_url:
             return "MiniMax"
         elif "dashscope" in base_url:
             return "Qwen"
         elif "kimi" in base_url:
-            return "Kimi"
+            return "moonshot.ai"
+        elif "moonshot" in base_url:
+            return "moonshot.ai"
         elif "deepseek" in self.name.lower():
             return "DeepSeek"
         elif "glm" in self.name.lower():
-            return "GLM"
+            return "Zhipu.AI"
         elif "minimax" in self.name.lower():
             return "MiniMax"
         elif "qwen" in self.name.lower():
             return "Qwen"
         elif "kimi" in self.name.lower():
-            return "Kimi"
+            return "moonshot.ai"
         return "Unknown"
 
     @field_validator("env")
@@ -147,8 +149,10 @@ class ProfileStore:
                         profile = SettingsProfile.from_file(profile_path)
                         profiles.append(profile)
                         seen_names.add(profile_info["name"])
-                    except Exception:
-                        # Skip invalid profiles
+                    except Exception as e:
+                        # Skip invalid profiles but log the issue
+                        import sys
+                        print(f"Warning: Skipping invalid profile '{profile_info['name']}' from {profile_info['file']}: {e}", file=sys.stderr)
                         continue
 
         return sorted(profiles, key=lambda p: p.name)

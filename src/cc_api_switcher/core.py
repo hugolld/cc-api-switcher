@@ -34,12 +34,6 @@ class CcApiSwitcher:
         """
         # Store global config for backup settings
         self.global_config = global_config
-        if self.global_config is None:
-            try:
-                self.global_config = GlobalConfig()
-            except Exception:
-                # Allow operation without global config (legacy/local mode)
-                self.global_config = None
 
         # Use global config for default target path if provided
         if self.global_config and not target_path:

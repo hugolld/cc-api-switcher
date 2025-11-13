@@ -92,23 +92,28 @@ cc-api-switch migrate --dry-run
 
 ## Architecture
 
-### Module Structure
+### Module Structure (Post-Refactor)
 ```
 src/cc_api_switcher/
-├── __init__.py         # Package version info
-├── cli.py              # Typer-based CLI commands (13 commands across 2 groups)
-├── config.py           # Profile models and validation
-├── core.py             # Core switching logic
-├── exceptions.py       # Custom exceptions
-├── global_config.py    # Global configuration management (NEW)
-└── migration.py        # Profile migration utilities (NEW)
+├── __init__.py                 # Package version info
+├── cli/                        # Modular CLI architecture
+│   ├── app.py                  # Main typer app initialization
+│   ├── base.py                 # BaseCommand class with shared infrastructure
+│   ├── commands.py             # Core commands (list, switch, show, validate, backup, restore, diff, import, edit)
+│   ├── config_commands.py      # Configuration commands (init, config, profile-dir, migrate)
+│   └── helpers.py              # Common helper functions for CLI operations
+├── config.py                   # Profile models, validation, ProfileStore
+├── core.py                     # Core switching logic with atomic operations
+├── exceptions.py               # Custom exception hierarchy
+├── global_config.py            # Global configuration management
+└── migration.py                # Profile migration utilities
 ```
 
 ### Core Classes and Components
 
 **`CcApiSwitcher` (core.py:17-198)**
 - Main switching logic with atomic file operations
-- Backup management: automatic backup creation, retention (last 10), cleanup
+- Backup management: automatic backup creation, retention (currently hard-coded to 10), cleanup
 - Target path management: defaults to `~/.claude/settings.json`
 - Security: sets 0o600 permissions on settings files
 - Atomic switching: uses `temp_file + os.replace()` pattern
@@ -119,29 +124,30 @@ src/cc_api_switcher/
 - Required field validation: ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN
 - API token masking algorithm (config.py:155-171)
 
+**`ProfileStore` (config.py:95-249)**
+- Profile discovery and management
+- Hierarchical discovery: CLI arg → env var → global config → local directory
+- Handles both explicit directory mode and global configuration mode
+- **CRITICAL**: `profiles_dir` is None in global mode, causing crashes in import/edit commands
+
 **`GlobalConfig` (global_config.py:25-249)**
 - XDG Base Directory specification compliance
-- Hierarchical profile discovery with 4 levels: CLI arg → env var → global config → local
-- Environment variable support (`CC_API_SWITCHER_PROFILE_DIR`, `XDG_CONFIG_HOME`)
 - Configuration persistence in `~/.config/cc-api-switcher/config.json`
-- Default target path and backup retention configuration
+- Default target path and backup retention configuration (currently ignored by core)
+- Environment variable support (`CC_API_SWITCHER_PROFILE_DIR`, `XDG_CONFIG_HOME`)
 
 **`ProfileMigration` (migration.py:20-273)**
-- Profile discovery from common locations (current dir, home, profiles dir)
+- Profile discovery from common locations
 - Safe migration with force/dry-run options and validation
 - Local cleanup utilities with user confirmation
 - Rich progress reporting and detailed status information
 
-**Custom Exception Hierarchy (exceptions.py:4-32)**
-- Base: `CcApiSwitcherError`
-- Derived: `ProfileNotFoundError`, `InvalidProfileError`, `BackupError`, `ValidationError`
-
-**CLI Architecture (cli.py:15-600+)**
-- Entry point: `cc_api_switcher.cli:app`
-- Rich-powered terminal output with tables and colors
+**Modular CLI Architecture (`src/cc_api_switcher/cli/`)**
+- **BaseCommand** (base.py): Shared infrastructure for all commands
 - **Commands group** (9 commands): list, switch, show, validate, backup, restore, diff, import, edit
 - **Configuration group** (4 commands): init, config, profile-dir, migrate
-- Uses CliRunner for testing
+- Rich-powered terminal output with tables and colors
+- Entry point: `cc_api_switcher.cli:app`
 
 ### Provider Detection System
 
@@ -186,7 +192,7 @@ Auto-detects providers from URL patterns in `SettingsProfile.provider` property:
 **Backup System:**
 - Location: `~/.config/cc-api-switcher/backups/`
 - Format: `{target_filename}.backup.{timestamp}`
-- Retention: Configurable count (default 10), auto-cleanup of older backups
+- Retention: Currently hard-coded to 10 (ignores GlobalConfig setting)
 
 ### Profile Migration System
 
@@ -195,12 +201,6 @@ Auto-detects providers from URL patterns in `SettingsProfile.provider` property:
 2. **Validation**: Verify profile integrity and required fields
 3. **Migration**: Copy profiles to global configuration directory
 4. **Cleanup**: Optionally remove original local files
-
-**Migration Sources:**
-- Current working directory
-- User home directory
-- Custom profile directories
-- Existing `~/.config/cc-api-switcher/profiles/` (detect existing setup)
 
 **Migration Commands:**
 - `cc-api-switch migrate --dry-run`: Preview migration without changes
@@ -243,7 +243,7 @@ Profile files follow this JSON format (stored as `{name}_settings.json`):
 - pytest: Coverage reports with HTML output
 
 **Testing Architecture:**
-- 91 total tests across 5 test files
+- 91 total tests across 5 test files + 2 CLI test files
 - CLI tests: Typer CliRunner for command testing
 - Config tests: Profile validation, token masking
 - Core tests: Atomic operations, backup/restore
@@ -286,10 +286,27 @@ Profile files follow this JSON format (stored as `{name}_settings.json`):
 - Progress reporting with rich output
 - Rollback capabilities for failed operations
 
+## Critical Known Issues (Verified)
+
+### 1. CLI Import/Edit Commands Crash in Global Mode
+**Status**: ❌ **ACTIVE BUG** - Commands crash when `--dir` is not specified due to null pointer dereference on `store.profiles_dir`
+**Location**: `src/cc_api_switcher/cli/commands.py:579` and `src/cc_api_switcher/cli/commands.py:639`
+**Impact**: Breaks primary global workflow for import/edit operations
+
+### 2. Backup/Restore Commands Ignore Configured Default Target
+**Status**: ❌ **ACTIVE BUG** - Don't respect configured default target paths from global config
+**Location**: `src/cc_api_switcher/cli/commands.py:312-443`
+**Impact**: Backup/restore always use `~/.claude/settings.json` regardless of user configuration
+
+### 3. Hard-coded Backup Retention
+**Status**: ❌ **ACTIVE BUG** - Ignores `backup_retention_count` from GlobalConfig, always uses 10
+**Location**: `src/cc_api_switcher/core.py:82-115`
+**Impact**: User configuration for backup retention is ignored
+
 ## Development Workflow
 
 ### Making Changes
-1. Always run tests before committing: `PYTHONPATH=src .venv/bin/pytest` (or `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run pytest`)
+1. Always run tests before committing: `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run pytest`
 2. Address test failures: Currently 12 failed, 79 passed (61% coverage)
 3. Format and lint code: `uv run ruff format . && uv run ruff check .`
 4. Run type checking: `uv run mypy src`
@@ -386,6 +403,11 @@ with tempfile.TemporaryDirectory() as temp_dir:
 - Test cleanup operations thoroughly
 - Ensure user confirmation works correctly
 
+**When Fixing Critical Bugs:**
+- **Import/Edit Crash**: Add null checks for `store.profiles_dir` or create `ProfileStore.get_profile_path()` helper
+- **Backup Target**: Mirror switch/show pattern - use `GlobalConfig.get_default_target_path()`
+- **Backup Retention**: Use `global_config.get_backup_retention_count()` instead of hard-coded 10
+
 **OpenSpec Integration:**
 - Use `/openspec:proposal` for significant changes
 - Follow change proposal process for breaking changes
@@ -481,27 +503,12 @@ The tool supports both legacy local configuration and modern global configuratio
 - Environment variables can override default locations
 - XDG Base Directory specification compliance
 
-## Current Known Issues
+### Current Development Priorities
+1. **Fix critical bugs** that crash import/edit commands in global mode (Issue #1)
+2. **Make backup/restore respect user configuration** for target paths and retention (Issues #2, #3)
+3. **Add comprehensive test coverage** for global workflow scenarios
+4. **Consider CLI architecture improvements** based on modular foundation
+5. **Address 12 failing tests** to restore test suite health (61% coverage)
 
-### Critical Bugs (CODE_REVIEW.md Verified)
-1. **CLI Import/Edit Commands Crash in Global Mode** - Commands crash when `--dir` is not specified due to null pointer dereference on `store.profiles_dir`
-2. **Backup/Restore Commands Ignore Configured Default Target** - Don't respect configured default target paths from global config
-3. **Hard-coded Backup Retention** - Ignores `backup_retention_count` from GlobalConfig, always uses 10
-
-### Testing Gaps
-- CLI tests only use `--dir` flag, leaving global workflow (default mode) untested
-- Missing tests for import/edit commands in global mode
-- Missing integration tests between GlobalConfig and CLI commands
-
-### Current Test Status
-- **Suite Result**: 12 failed, 79 passed (61% coverage)
-- **Test Command**: `PYTHONPATH=src .venv/bin/pytest` (PYTHONPATH required for module imports)
-- **Total Tests**: 91 tests across 5 test files
-- **Failure Rate**: 13.2% (12 failures indicate active bugs, particularly in global workflow)
-
-### Development Priorities
-1. **Fix failing tests** - Address 12 test failures (13.2% failure rate) to restore test suite health
-2. Fix critical bugs that crash import/edit commands in global mode
-3. Make backup/restore commands respect user configuration
-4. Add comprehensive test coverage for global workflow scenarios
-5. Consider CLI architecture modularization (cli.py is 943 lines)
+### Critical Bug Impact
+The three verified bugs significantly impact the global workflow, which is the intended primary usage mode. Users cannot reliably use import/edit commands, backup/restore ignore their configuration, and backup retention settings are ignored. These are **BLOCKER** level issues for global configuration users.
