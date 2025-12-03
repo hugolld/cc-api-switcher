@@ -70,13 +70,31 @@ pip install cc-api-switcher
 After installation, initialize global configuration:
 
 ```bash
-cc-api-switch init
+cas init
 ```
 
 If you have existing profile files, migrate them to global configuration:
 
 ```bash
-cc-api-switch migrate --force
+cas migrate --force
+```
+
+### Migration from Previous Versions
+
+**⚠️ BREAKING CHANGE**: The command has been renamed from `cc-api-switch` to `cas` for convenience.
+
+If you were using the previous `cc-api-switch` command:
+- The new command is `cas` (shorter and easier to type)
+- All functionality and arguments remain identical
+- Update any scripts or automation to use `cas` instead of `cc-api-switch`
+- The old `cc-api-switch` command is no longer available after updating
+
+```bash
+# Old command (no longer available)
+cc-api-switch list
+
+# New command (use this instead)
+cas list
 ```
 
 ## Usage
@@ -85,55 +103,55 @@ cc-api-switch migrate --force
 
 #### List all available profiles
 ```bash
-cc-api-switch list
+cas list
 ```
 
 #### Switch to a profile
 ```bash
-cc-api-switch switch deepseek
-cc-api-switch switch glm
-cc-api-switch switch minimax
-cc-api-switch switch qwen
+cas switch deepseek
+cas switch glm
+cas switch minimax
+cas switch qwen
 ```
 
 #### Show current profile
 ```bash
-cc-api-switch show
+cas show
 ```
 
 #### Validate a profile
 ```bash
-cc-api-switch validate deepseek
+cas validate deepseek
 ```
 
 #### Create manual backup
 ```bash
-cc-api-switch backup
+cas backup
 ```
 
 #### List available backups
 ```bash
-cc-api-switch restore --list
+cas restore --list
 ```
 
 #### Restore from backup
 ```bash
-cc-api-switch restore settings.json.backup.20251103_143022
+cas restore settings.json.backup.20251103_143022
 ```
 
 #### Compare two profiles
 ```bash
-cc-api-switch diff deepseek glm
+cas diff deepseek glm
 ```
 
 #### Import a profile from file
 ```bash
-cc-api-switch import ~/Downloads/my-profile.json --name custom
+cas import ~/Downloads/my-profile.json --name custom
 ```
 
 #### Edit a profile
 ```bash
-cc-api-switch edit deepseek
+cas edit deepseek
 ```
 
 ### Advanced Usage
@@ -141,76 +159,76 @@ cc-api-switch edit deepseek
 #### Specify custom directories
 ```bash
 # List profiles from a specific directory
-cc-api-switch list --dir ~/my-profiles
+cas list --dir ~/my-profiles
 
 # Switch using profiles from a specific directory
-cc-api-switch switch deepseek --dir ~/my-profiles
+cas switch deepseek --dir ~/my-profiles
 
 # Import into a specific directory
-cc-api-switch import profile.json --name new --dir ~/my-profiles
+cas import profile.json --name new --dir ~/my-profiles
 ```
 
 #### Specify custom target path
 ```bash
 # Switch to a different settings file location
-cc-api-switch switch deepseek --target ~/.config/claude/settings.json
+cas switch deepseek --target ~/.config/claude/settings.json
 ```
 
 #### Disable automatic backup
 ```bash
-cc-api-switch switch deepseek --no-backup
+cas switch deepseek --no-backup
 ```
 
 #### Verbose output
 ```bash
-cc-api-switch switch deepseek --verbose
+cas switch deepseek --verbose
 ```
 
 ### Global Configuration
 
 #### Initialize global configuration
 ```bash
-cc-api-switch init
+cas init
 ```
 
 #### Show profile directory search order
 ```bash
-cc-api-switch profile-dir
+cas profile-dir
 ```
 
 #### Manage configuration settings
 ```bash
 # Show all configuration
-cc-api-switch config show
+cas config show
 
 # Get specific setting
-cc-api-switch config get default_profile_dir
+cas config get default_profile_dir
 
 # Set configuration value
-cc-api-switch config set auto_backup false
+cas config set auto_backup false
 ```
 
 #### Migrate existing profiles to global configuration
 ```bash
 # Preview migration (dry run)
-cc-api-switch migrate --dry-run
+cas migrate --dry-run
 
 # Perform migration
-cc-api-switch migrate
+cas migrate
 
 # Migrate and clean up local files
-cc-api-switch migrate --cleanup
+cas migrate --cleanup
 ```
 
 #### Environment Variables
 ```bash
 # Override profile directory
 export CC_API_SWITCHER_PROFILE_DIR="~/my-profiles"
-cc-api-switch list
+cas list
 
 # Use custom config directory
 export XDG_CONFIG_HOME="~/.my-config"
-cc-api-switch init
+cas init
 ```
 
 ## Profile Files
@@ -368,7 +386,7 @@ To add support for a new provider:
 
 #### Tool Not Found on macOS
 ```bash
-zsh: command not found: cc-api-switch
+zsh: command not found: cas
 ```
 **Solution**:
 1. Ensure uv is installed: `brew install uv`
@@ -402,7 +420,7 @@ source ~/.bash_profile
 ```
 Error: Profile 'deepseek' not found
 ```
-**Solution**: Use `cc-api-switch list` to see available profiles, or use `--dir` to specify the profile directory.
+**Solution**: Use `cas list` to see available profiles, or use `--dir` to specify the profile directory.
 
 #### Validation failed
 ```
@@ -426,7 +444,7 @@ Error: Failed to create backup
 
 #### macOS Path Issues
 If experiencing path-related issues:
-1. Use absolute paths: `cc-api-switch switch deepseek --target ~/Documents/custom-settings.json`
+1. Use absolute paths: `cas switch deepseek --target ~/Documents/custom-settings.json`
 2. Check Home Directory: `echo $HOME`
 3. Verify Claude Code installation: `which claude`
 

@@ -29,7 +29,7 @@ dependencies = [
 
 
 [project.scripts]
-cc-api-switch = "cc_api_switcher.cli:app"
+cas = "cc_api_switcher.cli:app"
 
 [build-system]
 requires = ["hatchling"]

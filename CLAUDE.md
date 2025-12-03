@@ -81,13 +81,13 @@ uv run mypy src
 PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m cc_api_switcher.cli list
 
 # Test installed command
-uv run cc-api-switch list
+uv run cas list
 
 # Test global configuration initialization
-cc-api-switch init
+cas init
 
 # Test migration utilities
-cc-api-switch migrate --dry-run
+cas migrate --dry-run
 ```
 
 ## Architecture
@@ -203,10 +203,10 @@ Auto-detects providers from URL patterns in `SettingsProfile.provider` property:
 4. **Cleanup**: Optionally remove original local files
 
 **Migration Commands:**
-- `cc-api-switch migrate --dry-run`: Preview migration without changes
-- `cc-api-switch migrate`: Perform migration with confirmation
-- `cc-api-switch migrate --force`: Skip confirmation prompts
-- `cc-api-switch migrate --cleanup`: Remove original files after migration
+- `cas migrate --dry-run`: Preview migration without changes
+- `cas migrate`: Perform migration with confirmation
+- `cas migrate --force`: Skip confirmation prompts
+- `cas migrate --cleanup`: Remove original files after migration
 
 ### Profile File Structure
 
@@ -235,7 +235,7 @@ Profile files follow this JSON format (stored as `{name}_settings.json`):
 ## Configuration Details
 
 **pyproject.toml Key Settings:**
-- Entry point: `cc-api-switch = "cc_api_switcher.cli:app"`
+- Entry point: `cas = "cc_api_switcher.cli:app"`
 - Package: `packages = ["src/cc_api_switcher"]`
 - Line length: 88 characters (ruff)
 - Python: >=3.8, tested on 3.12
@@ -311,7 +311,7 @@ Profile files follow this JSON format (stored as `{name}_settings.json`):
 3. Format and lint code: `uv run ruff format . && uv run ruff check .`
 4. Run type checking: `uv run mypy src`
 5. Test CLI manually: `PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m cc_api_switcher.cli list`
-6. Test global configuration: `cc-api-switch init && cc-api-switch profile-dir`
+6. Test global configuration: `cas init && cas profile-dir`
 7. Verify global workflow: Test commands without `--dir` flag to ensure no crashes
 
 ### Testing Patterns
@@ -379,7 +379,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
 - Use `PYTHONPATH=/path/to/src uv run python -m cc_api_switcher.cli` for testing
 - Install with `uv sync --reinstall` after structural changes
 - Test both module execution and installed command
-- Test with global configuration initialized: `cc-api-switch init`
+- Test with global configuration initialized: `cas init`
 
 **When Modifying Core Logic:**
 - Follow atomic operations pattern for file writes
@@ -425,14 +425,14 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
 **Installation Issues**
 ```bash
-# ❌ Wrong: uv tool install . --name cc-api-switch
+# ❌ Wrong: uv tool install . --name cas
 # ✅ Correct: uv tool install .
 ```
 
 **CLI Command Not Found**
 ```bash
 # After installation, the command should be available as:
-cc-api-switch list
+cas list
 
 # If not found, check if uv's bin directory is in PATH
 # or use the module directly:
@@ -442,14 +442,14 @@ PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m
 **Global Configuration Issues**
 - Configuration directory: `~/.config/cc-api-switcher/`
 - Profile directory: `~/.config/cc-api-switcher/profiles/`
-- Use `cc-api-switch profile-dir` to check discovery order
-- Use `cc-api-switch config show` to view current configuration
-- Initialize with `cc-api-switch init` if missing
+- Use `cas profile-dir` to check discovery order
+- Use `cas config show` to view current configuration
+- Initialize with `cas init` if missing
 
 **Migration Issues**
 - Always test with `--dry-run` first
 - Check file permissions before migration
-- Use `cc-api-switch migrate --force` to skip confirmations
+- Use `cas migrate --force` to skip confirmations
 - Profiles are validated before and after migration
 - Original files are preserved unless `--cleanup` is used
 
@@ -465,10 +465,10 @@ PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m
 PYTHONPATH=/Users/hugodong/Documents/Claude/cc-api-switcher/src uv run python -m cc_api_switcher.cli --debug list
 
 # Check profile discovery order
-cc-api-switch profile-dir
+cas profile-dir
 
 # Show global configuration
-cc-api-switch config show
+cas config show
 ```
 
 ## Important Development Notes
@@ -480,7 +480,7 @@ uv tool install .  # ✅ Correct - uses name from pyproject.toml
 ```
 NOT:
 ```bash
-uv tool install . --name cc-api-switch  # ❌ Incorrect -- --name flag doesn't exist
+uv tool install . --name cas  # ❌ Incorrect -- --name flag doesn't exist
 ```
 
 ### Testing Requirements
